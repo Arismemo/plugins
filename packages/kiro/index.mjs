@@ -655,13 +655,24 @@ function buildKiro(req, model, profile, budget) {
     if (parts.some((p) => p?.cache_control)) marked.add(msg)
   }
   const user = () => ({ content: "", modelId: model, origin: "KIRO_CLI" })
-  // PATCH (framed system): a system-role message is not just another user
-  // turn. Collected here and framed below, it keeps the authority the caller
-  // meant it to carry against Kiro's harness prompt above.
-  const sysMsgs = []
-  for (const m of req.messages ?? []) if (m.role === "system") sysMsgs.push(textOf(m.content))
+  // PATCH (framed system): a LEADING system message is the caller's persona
+  // for the whole conversation: collected here, framed below, it goes to the
+  // head of the first message with the authority it is meant to carry
+  // against Kiro's harness prompt. A system message mid-conversation (a
+  // hook's context, an environment note) stays where it is, merged into the
+  // turn it belongs to, as before.
+  const leadSys = new Set()
+  {
+    let leading = true
+    for (const m of req.messages ?? []) {
+      if (m.role !== "system") { leading = false; continue }
+      if (leading) leadSys.add(m)
+    }
+  }
+  const sysMsgs = [...leadSys].map((m) => textOf(m.content))
+  const sysMarked = [...leadSys].some((m) => Array.isArray(m.content) && m.content.some((p) => p?.cache_control))
   for (const m of req.messages ?? []) {
-    if (m.role === "system") continue
+    if (leadSys.has(m)) continue
     const parts = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content ?? []
     const texts = []
     if (m.role === "assistant") {
@@ -771,6 +782,8 @@ ${system}
 
 ` + entries[0].userInputMessage.content
   if (Array.isArray(req.system)) mark(entries[0].userInputMessage, req.system)
+  // a leading system message's own cache marks cover the same head
+  if (sysMarked) marked.add(entries[0].userInputMessage)
 
   // the caller's tools, and any the conversation used that it no longer
   // offers — Kiro rejects a history naming a tool it wasn't given
@@ -1085,6 +1098,15 @@ async function* events(body, model, budget) {
   // Kiro says how full the context is rather than how many tokens
   if (!usage.input && pct > 0 && window > 0) usage.input = Math.floor((pct / 100) * window)
   if (!usage.output) usage.output = Math.floor((said + 3) / 4)
+  // PATCH (harness deduction): Kiro's server wraps every request in a fixed
+  // ~6.5k-token agent harness prompt that it counts as input usage; the
+  // caller never asked for it. Take that fixed overhead back out (only when
+  // input is clearly harness-sized) so relays billed on this usage charge
+  // the caller only for their own tokens. The Kiro account's real quota
+  // still burns at full rate; magpie's own usage cards read the reduced
+  // numbers.
+  const HARNESS_TOKENS = 6500
+  if (usage.input >= HARNESS_TOKENS) usage.input -= HARNESS_TOKENS
   let reason = "end_turn"
   if (tools > 0) reason = "tool_use"
   else if (/^max_tokens$/i.test(stop)) reason = "max_tokens"
