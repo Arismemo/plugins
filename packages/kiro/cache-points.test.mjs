@@ -61,8 +61,9 @@ test("a marked tool is followed by a cachePoint, as magpie marks the last tool o
   }
   const s = sent(r)
   expect(s.currentMessage.userInputMessage.userInputMessageContext.tools.map((t) => Object.keys(t)[0])).toEqual(["toolSpecification", "toolSpecification", "cachePoint"])
-  expect(s.history[0].userInputMessage.cachePoint).toEqual(POINT)
-  expect(s.history[1].assistantResponseMessage.cachePoint).toEqual(POINT)
+  // after the identity frame's turn (two entries)
+  expect(s.history[2].userInputMessage.cachePoint).toEqual(POINT)
+  expect(s.history[3].assistantResponseMessage.cachePoint).toEqual(POINT)
   expect(s.currentMessage.userInputMessage.cachePoint).toBeUndefined()
 })
 

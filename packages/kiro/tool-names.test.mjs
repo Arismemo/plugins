@@ -34,8 +34,9 @@ test("every tool name Kiro is sent is one it takes, and a short one is kept", ()
   expect(names[2]).toBe("Read")
   expect(new Set(names).size).toBe(3)
   expect(names[0].startsWith("mcp__plugin_cloudflare_cloudflare-docs__")).toBe(true)
-  // the call in the history names the tool as its declaration does
-  expect(s.history[1].assistantResponseMessage.toolUses[0].name).toBe(names[0])
+  // the call in the history names the tool as its declaration does (the
+  // history opens with the identity frame's turn, two entries)
+  expect(s.history[3].assistantResponseMessage.toolUses[0].name).toBe(names[0])
   expect(s.currentMessage.userInputMessage.userInputMessageContext.toolResults[0].toolUseId).toBe("toolu_1")
 })
 

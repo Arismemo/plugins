@@ -19,8 +19,9 @@ const sent = (req) => JSON.parse(_internal.buildKiro(req, "claude-sonnet-4.5", "
 
 test("a split turn's calls are answered by their real results", () => {
   const s = sent(split())
-  expect(s.history.map((e) => Object.keys(e)[0])).toEqual(["userInputMessage", "assistantResponseMessage"])
-  expect(s.history[1].assistantResponseMessage.toolUses.map((c) => c.toolUseId)).toEqual(["toolu_a", "toolu_b"])
+  // the identity frame's turn first, then the conversation
+  expect(s.history.map((e) => Object.keys(e)[0])).toEqual(["userInputMessage", "assistantResponseMessage", "userInputMessage", "assistantResponseMessage"])
+  expect(s.history[3].assistantResponseMessage.toolUses.map((c) => c.toolUseId)).toEqual(["toolu_a", "toolu_b"])
   expect(s.currentMessage.userInputMessage.userInputMessageContext.toolResults.map((r) => `${r.toolUseId}=${r.content[0].text}`)).toEqual(["toolu_a=A!", "toolu_b=B!"])
   expect(JSON.stringify(s)).not.toContain(NO_RESULT)
 })
